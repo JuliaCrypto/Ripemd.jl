@@ -13,5 +13,8 @@ notifications:
 
 sudo: false
 
+before_script:
+  - julia -e 'Pkg.add("Nettle")'
+
 after_success:
-- julia -e 'cd(Pkg.dir("Ripemd")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+  - julia -e 'cd(Pkg.dir("Ripemd")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
