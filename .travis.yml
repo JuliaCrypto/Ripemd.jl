@@ -1,5 +1,7 @@
 language: julia
 
+sudo: false
+
 os:
   - linux
   - osx
@@ -8,13 +10,13 @@ julia:
   - 0.6
   - nightly
 
-notifications:
-  email: false
+matrix:
+  allow_failures:
+    - nightly
 
-sudo: false
 
 before_script:
-  - julia -e 'Pkg.add("Nettle")'
+  - julia -e 'Pkg.add("Nettle"); Pkg.build("Nettle")'
 
 after_success:
   - julia -e 'cd(Pkg.dir("Ripemd")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
