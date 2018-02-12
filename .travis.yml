@@ -12,7 +12,7 @@ julia:
 
 matrix:
   allow_failures:
-    - nightly
+    - julia: nightly
 
 addons:
   apt:
