@@ -1,5 +1,5 @@
 function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
-                                         U <: Union{Array{UInt8, 1},
+                                         U <: Union{DenseArray{UInt8, 1},
                                                     NTuple{N, UInt8} where N}}
     UIntXXX = typeof(ctx.count)
 
