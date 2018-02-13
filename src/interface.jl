@@ -8,9 +8,9 @@ function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
     usedspace = ctx.count % bytes_per_block(T)
 
     while len - data_idx + usedspace >= bytes_per_block(T)
-        copy!(ctx.buffer, usedspace + 1,
-              data,       data_idx + 1,
-              bytes_per_block(T))
+        copyto!(ctx.buffer, usedspace + 1,
+                data,       data_idx + 1,
+                bytes_per_block(T))
 
         transform!(ctx)
 
@@ -20,9 +20,9 @@ function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
     end
 
     if len > data_idx
-        copy!(ctx.buffer, usedspace + 1,
-              data,       data_idx + 1,
-              len - data_idx)
+        copyto!(ctx.buffer, usedspace + 1,
+                data,       data_idx + 1,
+                len - data_idx)
         ctx.count += len - data_idx
     end
     return nothing
