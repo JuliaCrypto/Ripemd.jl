@@ -3,18 +3,18 @@ using Compat
 
 function openssl_ripemd160(x::AbstractString)
     # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
-    readstring(pipeline(`printf $x`, `openssl ripemd160`))[10:end - 1]
+    readstring(pipeline(`printf $x`, `openssl rmd160`))[10:end - 1]
 end
 
 function openssl_ripemd160(x::Array{UInt8, 1})
     # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
-    readstring(pipeline(`printf $(convert(String, x))`, `openssl ripemd160`))[10:end - 1]
+    readstring(pipeline(`printf $(convert(String, x))`, `openssl rmd160`))[10:end - 1]
 end
 
 function openssl_ripemd160(x::NTuple{N, UInt8}) where N
     # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
     t = convert(String, [x...])
-    readstring(pipeline(`printf $t`, `openssl ripemd160`))[10:end - 1]
+    readstring(pipeline(`printf $t`, `openssl rmd160`))[10:end - 1]
 end
 
 function vs_openssl(x)
