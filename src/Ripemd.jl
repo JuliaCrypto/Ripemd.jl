@@ -11,7 +11,7 @@ include("interface.jl")
 include("transform.jl")
 
 if VERSION < v"0.7.0-DEV.3213"
-    codeunits(x) = x
+    codeunits(x) = convert(Array{UInt8}, x)
 end
 
 function ripemd160(data::T) where T <: Union{DenseArray{UInt8, 1},
