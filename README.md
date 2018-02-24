@@ -14,4 +14,4 @@ julia> bytes2hex(ripemd160(b"test"))
 Currently only Ripemd160 is implemented and convenience functions are missing.
 
 Should work on julia 0.7, tests are failing because they depend on `Nettle.jl`
-which currently is not available for julia 0.7 yet.
+which is not available for julia 0.7 yet.
