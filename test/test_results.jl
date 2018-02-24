@@ -1,55 +1,58 @@
-using Nettle
+using Compat
+# TODO: `readstring` is deprecated, but compat doesn't seem to work on in
 
-function vs_nettle(x)
-    Ripemd.ripemd160(deepcopy(x)) == digest("ripemd160", deepcopy(x))
-end
-function vs_nettle_nocopy(x)
-    Ripemd.ripemd160(x) == digest("ripemd160", x)
-end
-function vs_nettle_tuple(x)
-    Ripemd.ripemd160(x) == digest("ripemd160", UInt8[x...])
+function openssl_ripemd160(x::AbstractString)
+    # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
+    readstring(pipeline(`printf $x`, `openssl ripemd160`))[10:end - 1]
 end
 
-@testset "Ripemd160 vs Nettle a's" begin
+function openssl_ripemd160(x::Array{UInt8, 1})
+    # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
+    readstring(pipeline(`printf $(convert(String, x))`, `openssl ripemd160`))[10:end - 1]
+end
+
+function openssl_ripemd160(x::NTuple{N, UInt8}) where N
+    # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
+    t = convert(String, [x...])
+    readstring(pipeline(`printf $t`, `openssl ripemd160`))[10:end - 1]
+end
+
+function vs_openssl(x)
+    bytes2hex(Ripemd.ripemd160(x)) == openssl_ripemd160(x)
+end
+
+@testset "Ripemd160 vs openssl a's" begin
     for i in 1:1000
         x = [0x61 for j in 1:i]
-        @test vs_nettle(x)
+        @test vs_openssl(x)
     end
     for i in 1:1000
         x = *(["a" for j in 1:i]...)
-        @test vs_nettle(x)
-    end
-    for i in 1:1000
-        x = [0x61 for j in 1:i]
-        @test vs_nettle_nocopy(x)
+        @test vs_openssl(x)
     end
     # This takes a long time, because Julia will compile a different function
     # for each length/loop iterations
     for i in 1:10
         x = ntuple(x -> 0x61, i)
-        @test vs_nettle_tuple(x)
+        @test vs_openssl(x)
     end
 end
 
-@testset "Ripemd160 vs Nettle abc" begin
+@testset "Ripemd160 vs openssl abc" begin
     d = Ripemd.codeunits("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
     for i in 1:1000
         x = [d[j % length(d) + 1] for j in 1:i]
-        @test vs_nettle(x)
+        @test vs_openssl(x)
     end
     for i in 1:1000
         x = *([Char(d[j % length(d) + 1]) for j in 1:i]...)
-        @test vs_nettle_nocopy(x)
-    end
-    for i in 1:1000
-        x = [d[j % length(d) + 1] for j in 1:i]
-        @test vs_nettle_nocopy(x)
+        @test vs_openssl(x)
     end
     # This takes a long time, because Julia will compile a different function
     # for each length/loop iterations
     for i in 1:10
-        x = [d[j % length(d) + 1] for j in 1:i]
-        @test vs_nettle_nocopy(x)
+        x = ntuple(j -> d[j % length(d) + 1], i)
+        @test vs_openssl(x)
     end
 end
 
