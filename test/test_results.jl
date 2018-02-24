@@ -1,21 +1,22 @@
 using Compat
-# TODO: `readstring` is deprecated, but compat doesn't seem to work on in
+
+if VERSION < v"0.7"
+    Base.read(x, ::Type{String}) = readstring(x)
+end
 
 function openssl_ripemd160(x::AbstractString)
-    # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
-    readstring(pipeline(`printf $x`, `openssl rmd160`))[10:end - 1]
+    read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
 end
 
 function openssl_ripemd160(x::Array{UInt8, 1})
-    # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
-    readstring(pipeline(`printf $(convert(String, x))`,
-                        `openssl rmd160`))[10:end - 1]
+    read(pipeline(`printf $(String(x))`,
+                  `openssl rmd160`),
+         String)[10:end - 1]
 end
 
 function openssl_ripemd160(x::NTuple{N, UInt8}) where N
-    # read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
-    t = convert(String, [x...])
-    readstring(pipeline(`printf $t`, `openssl rmd160`))[10:end - 1]
+    t = String([x...])
+    read(pipeline(`printf $t`, `openssl rmd160`), String)[10:end - 1]
 end
 
 function vs_openssl(x)
