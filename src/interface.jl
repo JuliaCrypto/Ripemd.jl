@@ -74,6 +74,7 @@ function digest!(ctx::T) where {T <: RIPEMD160_CTX}
 
     transform!(ctx)
 
+    # TODO: is this safe for 0.7? the [1:end] should make a copy and get around
+    # the lazy reinterpret.
     return reinterpret(UInt8, ctx.state)[1:digest_length(T)]
 end
-
