@@ -58,6 +58,16 @@ end
     end
 end
 
+@testset "Ripemd160 1M a's" begin
+
+    d1 = [0x61 for i in 1:1_000_000];
+    d2 = ntuple((i) -> 0x61, 1_000_000);
+    r = "52783243c1697bdbe16d37f97f68f08325dc1528"
+
+    @test bytes2hex(Ripemd.ripemd160(d1)) == r
+    @test bytes2hex(Ripemd.ripemd160(d2)) == r
+end
+
 @testset "Ripemd160" begin
     @test bytes2hex(Ripemd.ripemd160("asdf")) ==
         "0ef2aed6346def670a8019e4ea42cf4c76018139"
