@@ -1,0 +1,6 @@
+name = "Ripemd"
+uuid = "a8a98f30-61ac-11e8-3989-23a341195215"
+version = "0.1.0"
+authors = ["Guido Kraemer <gdkrmr@users.noreply.github.com>"]
+
+[deps]
