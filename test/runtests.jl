@@ -1,5 +1,5 @@
 using Ripemd
-using Test
+using Base.Test
 
 files = readdir(".")
 
