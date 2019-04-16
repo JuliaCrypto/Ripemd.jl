@@ -1,5 +1,5 @@
 name = "Ripemd"
-uuid = "a8a98f30-61ac-11e8-3989-23a341195215"
+uuid = "92ef3814-971d-54d3-b0c1-59b1d13fee15"
 authors = ["Guido Kraemer <gdkrmr@users.noreply.github.com>"]
 version = "0.2.0"
 
