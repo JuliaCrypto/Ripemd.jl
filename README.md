@@ -1,7 +1,7 @@
 # Ripemd.jl
 
-[![Build Status](https://travis-ci.org/gdkrmr/Ripemd.jl.svg?branch=master)](https://travis-ci.org/gdkrmr/Ripemd.jl)
-[![codecov.io](http://codecov.io/github/gdkrmr/Ripemd.jl/coverage.svg?branch=master)](http://codecov.io/github/gdkrmr/Ripemd.jl?branch=master)
+[![Build Status](https://travis-ci.org/JuliaCrypto/Ripemd.jl.svg?branch=master)](https://travis-ci.org/JuliaCrypto/Ripemd.jl)
+[![codecov.io](http://codecov.io/github/JuliaCrypto/Ripemd.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaCrypto/Ripemd.jl?branch=master)
 
 Pure Julia implementation of the [Ripemd](https://en.wikipedia.org/wiki/RIPEMD) hashing algorithm.
 Currently only Ripemd160 is implemented and convenience functions are missing.
