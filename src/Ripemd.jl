@@ -222,7 +222,7 @@ function transform!(ctx::RIPEMD160_CTX)
     nothing
 end
 
-function ripemd160(data::Union{Vector{UInt8}, NTuple{N,UInt8} where N})
+function ripemd160(data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
     ctx = RIPEMD160_CTX()
     update!(ctx, data)
     digest!(ctx)
