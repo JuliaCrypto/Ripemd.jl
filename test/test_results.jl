@@ -1,8 +1,3 @@
-using Compat
-
-if VERSION < v"0.7"
-    Base.read(x, ::Type{String}) = readstring(x)
-end
 
 function openssl_ripemd160(x::AbstractString)
     read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
