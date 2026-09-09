@@ -129,6 +129,7 @@ end
 # Tests for the convenience functions layered on top of the core
 # byte-vector implementation: update!(ctx, ::AbstractString),
 # update!(ctx, ::IO), ripemd160(::IO), ripemd160_file, and ripemd160_hex.
+
 const ALPHANUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 const VECTORS = Dict(
@@ -148,8 +149,13 @@ const VECTORS = Dict(
         ctx_bytes = Ripemd.RIPEMD160_CTX()
         Ripemd.update!(ctx_bytes, Vector{UInt8}(codeunits(s)))
 
-        @test bytes2hex(Ripemd.digest!(ctx_str)) == bytes2hex(Ripemd.digest!(ctx_bytes))
-        @test bytes2hex(Ripemd.digest!(ctx_str)) == hex
+        # digest! finalizes and mutates its context (padding + one more
+        # compression round), so it must be called exactly once per ctx.
+        hex_str = bytes2hex(Ripemd.digest!(ctx_str))
+        hex_bytes = bytes2hex(Ripemd.digest!(ctx_bytes))
+
+        @test hex_str == hex_bytes
+        @test hex_str == hex
     end
 
     # Splitting a single string across several update! calls should give
@@ -161,6 +167,10 @@ const VECTORS = Dict(
 end
 
 @testset "update!(ctx, ::IO) matches update!(ctx, ::Vector{UInt8})" begin
+    # Exercise chunk sizes both smaller and larger than the data, and
+    # chunk sizes that don't evenly divide either the data length or the
+    # 64-byte compression block size, since those are the boundaries most
+    # likely to expose an off-by-one in the streaming logic.
     for (s, hex) in VECTORS
         data = Vector{UInt8}(codeunits(s))
         for chunk_size in (1, 3, 7, 64, 4096)
@@ -170,6 +180,8 @@ end
         end
     end
 
+    # Data that spans several multiples of the internal 64-byte block,
+    # read back with a chunk size that doesn't align to block boundaries.
     big = repeat(UInt8('a'), 1000)
     ctx_io = Ripemd.RIPEMD160_CTX()
     Ripemd.update!(ctx_io, IOBuffer(big); chunk_size = 13)
@@ -225,11 +237,11 @@ end
         @test Ripemd.ripemd160_hex(s) == hex
         @test Ripemd.ripemd160_hex(s) == bytes2hex(Ripemd.ripemd160(s))
     end
-
     # ripemd160_hex should dispatch through the same generic `data`
-    # argument for bytes, tuples, and strings.
+    # argument for bytes and tuples too, not just strings.
     @test Ripemd.ripemd160_hex(Vector{UInt8}(codeunits("abc"))) == VECTORS["abc"]
     @test Ripemd.ripemd160_hex((Vector{UInt8}(codeunits("abc"))...,)) == VECTORS["abc"]
 end
 
 true
+
