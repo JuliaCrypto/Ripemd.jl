@@ -182,7 +182,7 @@ end
 
     # Data that spans several multiples of the internal 64-byte block,
     # read back with a chunk size that doesn't align to block boundaries.
-    big = repeat(UInt8('a'), 1000)
+    big = fill(UInt8('a'), 1000)
     ctx_io = Ripemd.RIPEMD160_CTX()
     Ripemd.update!(ctx_io, IOBuffer(big); chunk_size = 13)
 
@@ -222,7 +222,7 @@ end
     # (4096), to make sure the read loop terminates cleanly on eof()
     # right at a chunk boundary instead of looping or truncating.
     path, io = mktemp()
-    write(io, repeat(UInt8('a'), 4096 * 3))
+    write(io, fill(UInt8('a'), 4096 * 3))
     close(io)
     try
         expected = bytes2hex(Ripemd.ripemd160(repeat(UInt8('a'), 4096 * 3)))
