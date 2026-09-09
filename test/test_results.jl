@@ -202,7 +202,7 @@ end
     # 1,000,000 a's, streamed through an IOBuffer rather than materialized
     # as a single update! call, exercises the multi-chunk read loop.
     r = "52783243c1697bdbe16d37f97f68f08325dc1528"
-    million_a = repeat(UInt8('a'), 1_000_000)
+    million_a = fill(UInt8('a'), 1_000_000)
     @test bytes2hex(Ripemd.ripemd160(IOBuffer(million_a))) == r
 end
 
@@ -225,7 +225,7 @@ end
     write(io, fill(UInt8('a'), 4096 * 3))
     close(io)
     try
-        expected = bytes2hex(Ripemd.ripemd160(repeat(UInt8('a'), 4096 * 3)))
+        expected = bytes2hex(Ripemd.ripemd160(fill(UInt8('a'), 4096 * 3)))
         @test bytes2hex(Ripemd.ripemd160_file(path)) == expected
     finally
         rm(path; force = true)
