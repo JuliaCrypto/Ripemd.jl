@@ -25,6 +25,11 @@ const KK4 = UInt32(0x00000000)
 @inline ROTL32(x::UInt32, n::UInt8) =
     (x << n) | (x >> (UInt8(32) - n))
 
+# Read a little-endian UInt32 word out of a raw byte buffer, regardless of
+# host byte order. `ltoh` is a no-op on little-endian hosts and a `bswap`
+# on big-endian hosts, so this is what makes transform! endian-correct.
+@inline load32_le(buf::Ptr{UInt32}, i) = ltoh(unsafe_load(buf, i))
+
 @inline F0(x, y, z) = x ⊻ y ⊻ z
 @inline F1(x, y, z) = (x & y) | (~x & z)
 @inline F2(x, y, z) = (x | ~y) ⊻ z
@@ -75,7 +80,7 @@ macro L(i)
     r = left_p[i]
     s = left_q[i]
     esc(quote
-        t = $a + $f($b, $c, $d) + $k + unsafe_load(buf, $r)
+        t = $a + $f($b, $c, $d) + $k + load32_le(buf, $r)
         $a = ROTL32(UInt32(t), UInt8($s)) + $e
         $c = ROTL32($c, UInt8(10))
     end)
@@ -93,7 +98,7 @@ macro R(i)
     r = right_p[i]
     s = right_q[i]
     esc(quote
-        t = $a + $f($b, $c, $d) + $k + unsafe_load(buf, $r)
+        t = $a + $f($b, $c, $d) + $k + load32_le(buf, $r)
         $a = ROTL32(UInt32(t), UInt8($s)) + $e
         $c = ROTL32($c, UInt8(10))
     end)
@@ -115,7 +120,7 @@ digest_length(::Type{RIPEMD160_CTX}) = 20
 
 RIPEMD160_CTX() = RIPEMD160_CTX(copy(INIT_STATE), UInt64(0), zeros(UInt8, 64))
 
-""" 
+"""
     update!(ctx::RIPEMD160_CTX, data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
 
 Update the RIPEMD160 context `ctx` with the given `data`. The data can be a vector of bytes or a tuple of bytes.
@@ -168,7 +173,7 @@ end
 
 # --- Convenience methods -------------------------------------------------
 
-""" 
+"""
     update!(ctx::RIPEMD160_CTX, data::AbstractString)
 
 Update the RIPEMD160 context `ctx` with the given string `data`. The string is converted to bytes internally.
@@ -186,7 +191,7 @@ Nothing. The context `ctx` is updated in place.
 update!(ctx::RIPEMD160_CTX, data::AbstractString) =
     update!(ctx, Vector{UInt8}(codeunits(data)))
 
-""" 
+"""
     update!(ctx::RIPEMD160_CTX, io::IO; chunk_size::Integer = 4096)
 
 Update the RIPEMD160 context `ctx` with data read from the given IO stream `io`. The data is read in chunks of size `chunk_size`.
@@ -212,7 +217,7 @@ function update!(ctx::RIPEMD160_CTX, io::IO; chunk_size::Integer = 4096)
     nothing
 end
 
-""" 
+"""
     ripemd160(io::IO)
 
 Hash directly from an IO stream (e.g. `open(io -> ripemd160(io), path)`),
@@ -241,14 +246,22 @@ function ripemd160_file(path::AbstractString)
 end
 
 """
-    Return the digest as a lowercase hex string, if caller wants it in that
-    form, in order to display or compare a string compare rather than the raw bytes.
+    ripemd160_hex(data)
+
+Return the digest as a lowercase hex string, if the caller wants it in that
+form, in order to display or compare a string rather than the raw bytes.
 """
 ripemd160_hex(data) = bytes2hex(ripemd160(data))
 
 # Fallback bytes2hex in case an older Julia version doesn't already
 # export/define it in Base.
 if !isdefined(Base, :bytes2hex)
+    """
+        bytes2hex(bytes::AbstractVector{UInt8})
+
+    Fallback implementation of `Base.bytes2hex` for Julia versions where it
+    isn't already defined, returning the lowercase hex encoding of `bytes`.
+    """
     function bytes2hex(bytes::AbstractVector{UInt8})
         io = IOBuffer()
         for b in bytes
@@ -290,17 +303,30 @@ A vector of bytes representing the RIPEMD160 hash.
 function digest!(ctx::RIPEMD160_CTX)
     pad_remainder!(ctx)
 
-    bits = ctx.count << 3
+    # RIPEMD-160 stores the 64-bit bit-length little-endian; `htol` makes
+    # this correct on big-endian hosts too (no-op on little-endian ones).
+    bits = htol(ctx.count << 3)
 
     p = Ptr{UInt64}(pointer(ctx.buffer, 57))
     unsafe_store!(p, bits)
 
     transform!(ctx)
 
-    reinterpret(UInt8, ctx.state)[1:20] # we need [1:20] to make a copy here
+    # The five UInt32 state words must be emitted as little-endian bytes
+    # regardless of host order, so convert each word with `htol` before
+    # reinterpreting it as raw bytes.
+    le_state = map(htol, ctx.state)
+    reinterpret(UInt8, le_state)[1:20] # we need [1:20] to make a copy here
 end
 
-""" FIXME: works only on little-endian systems """
+"""
+Should work correctly on both little-endian and big-endian systems: word loads in
+transform! go through `load32_le` (uses `ltoh`), the bit-length field is
+written via `htol`, and the final digest bytes are produced from `htol`-ed
+state words -- so all raw-pointer traffic is explicitly normalized to the
+little-endian byte order RIPEMD-160 specifies, rather than relying on the
+host's native order.
+"""
 function transform!(ctx::RIPEMD160_CTX)
     # NB: @inbounds works on assumption ctx.buffer is always exactly 64 bytes in size
     @inbounds begin
@@ -403,6 +429,5 @@ function digest(name::AbstractString, data)
 
     throw(ArgumentError("unsupported digest: $name"))
 end
-
 
 end # module or file end
