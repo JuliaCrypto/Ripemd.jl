@@ -176,10 +176,12 @@ function digest!(ctx::RIPEMD160_CTX)
 
     transform!(ctx)
 
-    reinterpret(UInt8, ctx.state)[1:20]
+    reinterpret(UInt8, ctx.state)[1:20] # we need [1:20] to make a copy here
 end
 
+""" FIXME: works only on little-endian systems """
 function transform!(ctx::RIPEMD160_CTX)
+    # NB: @inbounds works on assumption ctx.buffer is always exactly 64 bytes in size
     @inbounds begin
         buf = Ptr{UInt32}(pointer(ctx.buffer))
 
