@@ -106,6 +106,12 @@ end
 
 abstract type RIPEMD_CTX end
 
+"""
+    RIPEMD160_CTX
+
+Mutable struct representing the context for the RIPEMD160 hash function.
+Contains the internal `state`, the `count` of processed bytes, and a `buffer` for input data.
+"""
 mutable struct RIPEMD160_CTX <: RIPEMD_CTX
     state::Vector{UInt32}
     count::UInt64
