@@ -115,7 +115,7 @@ digest_length(::Type{RIPEMD160_CTX}) = 20
 RIPEMD160_CTX() =
     RIPEMD160_CTX(copy(INIT_STATE), UInt64(0), zeros(UInt8, 64))
 
-function update!(ctx::RIPEMD160_CTX, data::Union{Vector{UInt8}, NTuple{N,UInt8} where N})
+function update!(ctx::RIPEMD160_CTX, data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
     len = length(data)
     pos = 1
 
