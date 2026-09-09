@@ -125,3 +125,111 @@ end
         "b0e20b6e3116640286ed3a87a5713079b21f5189"
     @test bytes2hex(Ripemd.ripemd160((Ripemd.codeunits(ROCKY_SPEECH)...,))) == ROCKY_RIPEMD160
 end
+
+# Tests for the convenience functions layered on top of the core
+# byte-vector implementation: update!(ctx, ::AbstractString),
+# update!(ctx, ::IO), ripemd160(::IO), ripemd160_file, and ripemd160_hex.
+const ALPHANUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+const VECTORS = Dict(
+    ""               => "9c1185a5c5e9fc54612808977ee8f548b2258d31",
+    "a"              => "0bdc9d2d256b3ee9daae347be6f4dc835a467ffe",
+    "abc"            => "8eb208f7e05d987a9b044a8e98c6b087f15a0bfc",
+    "asdf"           => "0ef2aed6346def670a8019e4ea42cf4c76018139",
+    "message digest" => "5d0689ef49d2fae572b881b123a85ffa21595f36",
+    ALPHANUM         => "b0e20b6e3116640286ed3a87a5713079b21f5189",
+)
+
+@testset "update!(ctx, ::AbstractString) matches update!(ctx, ::Vector{UInt8})" begin
+    for (s, hex) in VECTORS
+        ctx_str = Ripemd.RIPEMD160_CTX()
+        Ripemd.update!(ctx_str, s)
+
+        ctx_bytes = Ripemd.RIPEMD160_CTX()
+        Ripemd.update!(ctx_bytes, Vector{UInt8}(codeunits(s)))
+
+        @test bytes2hex(Ripemd.digest!(ctx_str)) == bytes2hex(Ripemd.digest!(ctx_bytes))
+        @test bytes2hex(Ripemd.digest!(ctx_str)) == hex
+    end
+
+    # Splitting a single string across several update! calls should give
+    # the same result as one call with the concatenation.
+    ctx = Ripemd.RIPEMD160_CTX()
+    Ripemd.update!(ctx, "message ")
+    Ripemd.update!(ctx, "digest")
+    @test bytes2hex(Ripemd.digest!(ctx)) == VECTORS["message digest"]
+end
+
+@testset "update!(ctx, ::IO) matches update!(ctx, ::Vector{UInt8})" begin
+    for (s, hex) in VECTORS
+        data = Vector{UInt8}(codeunits(s))
+        for chunk_size in (1, 3, 7, 64, 4096)
+            ctx = Ripemd.RIPEMD160_CTX()
+            Ripemd.update!(ctx, IOBuffer(data); chunk_size = chunk_size)
+            @test bytes2hex(Ripemd.digest!(ctx)) == hex
+        end
+    end
+
+    big = repeat(UInt8('a'), 1000)
+    ctx_io = Ripemd.RIPEMD160_CTX()
+    Ripemd.update!(ctx_io, IOBuffer(big); chunk_size = 13)
+
+    ctx_bytes = Ripemd.RIPEMD160_CTX()
+    Ripemd.update!(ctx_bytes, big)
+
+    @test bytes2hex(Ripemd.digest!(ctx_io)) == bytes2hex(Ripemd.digest!(ctx_bytes))
+end
+
+@testset "ripemd160(::IO) matches ripemd160(::Vector{UInt8}) and known vectors" begin
+    for (s, hex) in VECTORS
+        data = Vector{UInt8}(codeunits(s))
+        @test bytes2hex(Ripemd.ripemd160(IOBuffer(data))) == hex
+        @test bytes2hex(Ripemd.ripemd160(IOBuffer(data))) == bytes2hex(Ripemd.ripemd160(data))
+    end
+
+    # 1,000,000 a's, streamed through an IOBuffer rather than materialized
+    # as a single update! call, exercises the multi-chunk read loop.
+    r = "52783243c1697bdbe16d37f97f68f08325dc1528"
+    million_a = repeat(UInt8('a'), 1_000_000)
+    @test bytes2hex(Ripemd.ripemd160(IOBuffer(million_a))) == r
+end
+
+@testset "ripemd160_file matches ripemd160(::Vector{UInt8})" begin
+    for (s, hex) in VECTORS
+        path, io = mktemp()
+        write(io, s)
+        close(io)
+        try
+            @test bytes2hex(Ripemd.ripemd160_file(path)) == hex
+        finally
+            rm(path; force = true)
+        end
+    end
+
+    # A file whose size is an exact multiple of the default chunk_size
+    # (4096), to make sure the read loop terminates cleanly on eof()
+    # right at a chunk boundary instead of looping or truncating.
+    path, io = mktemp()
+    write(io, repeat(UInt8('a'), 4096 * 3))
+    close(io)
+    try
+        expected = bytes2hex(Ripemd.ripemd160(repeat(UInt8('a'), 4096 * 3)))
+        @test bytes2hex(Ripemd.ripemd160_file(path)) == expected
+    finally
+        rm(path; force = true)
+    end
+end
+
+@testset "ripemd160_hex matches bytes2hex(ripemd160(...)) and known vectors" begin
+    for (s, hex) in VECTORS
+        @test Ripemd.ripemd160_hex(s) == hex
+        @test Ripemd.ripemd160_hex(s) == bytes2hex(Ripemd.ripemd160(s))
+    end
+
+    # ripemd160_hex should dispatch through the same generic `data`
+    # argument for bytes, tuples, and strings.
+    @test Ripemd.ripemd160_hex(Vector{UInt8}(codeunits("abc"))) == VECTORS["abc"]
+    @test Ripemd.ripemd160_hex((Vector{UInt8}(codeunits("abc"))...,)) == VECTORS["abc"]
+end
+
+true
