@@ -107,13 +107,13 @@ mutable struct RIPEMD160_CTX <: RIPEMD_CTX
     buffer::Vector{UInt8}
 end
 
+# These are for external uses of the struct, to define the parameters of RIPEMD160 variant of RIPEMD
 bytes_per_block(::Type{RIPEMD160_CTX}) = 64
 words_per_block(::Type{RIPEMD160_CTX}) = 16
 state_type(::Type{RIPEMD160_CTX}) = UInt32
 digest_length(::Type{RIPEMD160_CTX}) = 20
 
-RIPEMD160_CTX() =
-    RIPEMD160_CTX(copy(INIT_STATE), UInt64(0), zeros(UInt8, 64))
+RIPEMD160_CTX() = RIPEMD160_CTX(copy(INIT_STATE), UInt64(0), zeros(UInt8, 64))
 
 function update!(ctx::RIPEMD160_CTX, data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
     len = length(data)
