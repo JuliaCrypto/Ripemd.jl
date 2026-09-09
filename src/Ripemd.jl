@@ -1,6 +1,6 @@
 module Ripemd
 
-export ripemd160, update!, digest!, digest, RIPEMD160_CTX
+export ripemd160, update!, digest!, digest, RIPEMD160_CTX, bytes2hex, ripemd160_file, ripemd160_hex
 
 const INIT_STATE = UInt32[
     0x67452301,
@@ -115,6 +115,21 @@ digest_length(::Type{RIPEMD160_CTX}) = 20
 
 RIPEMD160_CTX() = RIPEMD160_CTX(copy(INIT_STATE), UInt64(0), zeros(UInt8, 64))
 
+""" 
+    update!(ctx::RIPEMD160_CTX, data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
+
+Update the RIPEMD160 context `ctx` with the given `data`. The data can be a vector of bytes or a tuple of bytes.
+
+Arguments
+---------
+ctx : RIPEMD160_CTX
+    The RIPEMD160 context to update.
+data : Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N}
+    The input data to update the context with.
+Returns
+-------
+Nothing. The context `ctx` is updated in place.
+"""
 function update!(ctx::RIPEMD160_CTX, data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
     len = length(data)
     pos = 1
@@ -151,6 +166,100 @@ function update!(ctx::RIPEMD160_CTX, data::Union{AbstractVector{UInt8}, NTuple{N
     nothing
 end
 
+# --- Convenience methods -------------------------------------------------
+
+""" 
+    update!(ctx::RIPEMD160_CTX, data::AbstractString)
+
+Update the RIPEMD160 context `ctx` with the given string `data`. The string is converted to bytes internally.
+
+Arguments
+---------
+ctx : RIPEMD160_CTX
+    The RIPEMD160 context to update.
+data : AbstractString
+    The input string to update the context with.
+Returns
+-------
+Nothing. The context `ctx` is updated in place.
+"""
+update!(ctx::RIPEMD160_CTX, data::AbstractString) =
+    update!(ctx, Vector{UInt8}(codeunits(data)))
+
+""" 
+    update!(ctx::RIPEMD160_CTX, io::IO; chunk_size::Integer = 4096)
+
+Update the RIPEMD160 context `ctx` with data read from the given IO stream `io`. The data is read in chunks of size `chunk_size`.
+
+Arguments
+---------
+ctx : RIPEMD160_CTX
+    The RIPEMD160 context to update.
+io : IO
+    The input IO stream to read data from. This can be a file, stdin, etc.
+chunk_size : Integer, optional
+    The size of the chunks to read from the IO stream (default is 4096).
+Returns
+-------
+Nothing. The context `ctx` is updated in place.
+"""
+function update!(ctx::RIPEMD160_CTX, io::IO; chunk_size::Integer = 4096)
+    buf = Vector{UInt8}(undef, chunk_size)
+    while !eof(io)
+        n = readbytes!(io, buf)
+        update!(ctx, view(buf, 1:n))
+    end
+    nothing
+end
+
+""" 
+    ripemd160(io::IO)
+
+Hash directly from an IO stream (e.g. `open(io -> ripemd160(io), path)`),
+mirroring the AbstractVector{UInt8}/AbstractString methods below.
+"""
+function ripemd160(io::IO)
+    ctx = RIPEMD160_CTX()
+    update!(ctx, io)
+    digest!(ctx)
+end
+
+"""
+    ripemd160_file(path::AbstractString)
+
+Hash the contents of the file at the given `path` using the RIPEMD160 hash function.
+Arguments
+---------
+path : AbstractString
+    The path to the file to hash.
+Returns
+-------
+The RIPEMD160 hash of the file's contents as a vector of bytes.
+"""
+function ripemd160_file(path::AbstractString)
+    open(io -> ripemd160(io), path, "r")
+end
+
+"""
+    Return the digest as a lowercase hex string, if caller wants it in that
+    form, in order to display or compare a string compare rather than the raw bytes.
+"""
+ripemd160_hex(data) = bytes2hex(ripemd160(data))
+
+# Fallback bytes2hex in case an older Julia version doesn't already
+# export/define it in Base.
+if !isdefined(Base, :bytes2hex)
+    function bytes2hex(bytes::AbstractVector{UInt8})
+        io = IOBuffer()
+        for b in bytes
+            print(io, string(b, base = 16, pad = 2))
+        end
+        String(take!(io))
+    end
+end
+
+# --------------------------------------------------------------------------
+
 function pad_remainder!(ctx::RIPEMD160_CTX)
     used = Int(ctx.count & 0x3f)
     ctx.buffer[used + 1] = 0x80
@@ -166,6 +275,18 @@ function pad_remainder!(ctx::RIPEMD160_CTX)
     nothing
 end
 
+"""
+    digest!(ctx::RIPEMD160_CTX)
+
+Finalize the RIPEMD160 hash computation and return the digest as a vector of bytes.
+Arguments
+---------
+ctx : RIPEMD160_CTX
+    The context containing the current state of the hash computation.
+Returns
+-------
+A vector of bytes representing the RIPEMD160 hash.
+"""
 function digest!(ctx::RIPEMD160_CTX)
     pad_remainder!(ctx)
 
@@ -224,15 +345,53 @@ function transform!(ctx::RIPEMD160_CTX)
     nothing
 end
 
+"""
+    ripemd160(data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
+
+Compute the RIPEMD160 hash of the given data.
+Arguments
+---------
+data : Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N}
+    The input data to hash.
+Returns
+-------
+A vector of bytes representing the RIPEMD160 hash of the input data.
+"""
 function ripemd160(data::Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N})
     ctx = RIPEMD160_CTX()
     update!(ctx, data)
     digest!(ctx)
 end
 
+"""
+    ripemd160(str::AbstractString)
+
+Compute the RIPEMD160 hash of the given string.
+Arguments
+---------
+str : AbstractString
+    The input string to hash.
+Returns
+-------
+A vector of bytes representing the RIPEMD160 hash of the input string.
+"""
 ripemd160(str::AbstractString) =
     ripemd160(Vector{UInt8}(codeunits(str)))
 
+"""
+    digest(name::AbstractString, data)
+
+Compute the hash of the given data using the specified digest algorithm.
+Arguments
+---------
+name : AbstractString
+    The name of the digest algorithm (e.g., "ripemd160").
+data : Union{AbstractVector{UInt8}, NTuple{N,UInt8} where N}
+    The input data to hash.
+Returns
+-------
+A vector of bytes representing the hash of the input data.
+"""
 function digest(name::AbstractString, data)
     lname = lowercase(name)
 
@@ -244,5 +403,6 @@ function digest(name::AbstractString, data)
 
     throw(ArgumentError("unsupported digest: $name"))
 end
+
 
 end # module or file end
