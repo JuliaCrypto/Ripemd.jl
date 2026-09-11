@@ -1,7 +1,8 @@
-# TODO:
-const BIG_ENDIAN = ENDIAN_BOM == 0x01020304
 
-# TODO: endianness
+# Read a little-endian UInt32 word out of a raw byte buffer, regardless of
+# host byte order. `ltoh` is a no-op on little-endian hosts and a `bswap`
+# on big-endian hosts. Used in macros L and R to make transform! endian-correct.
+@inline load32_le(buf::Ptr{UInt32}, i) = ltoh(unsafe_load(buf, i))
 
 const INIT_STATE = UInt32[0x67452301,
                           0xEFCDAB89,
@@ -48,54 +49,38 @@ const right_q = ( 8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6,
                   15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8,
                   8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11 )
 
-# Left lane generator macro
 macro L(i)
-    # @assert i <= 80
-    # @assert i >= 1
-
-    # Rotate the words
     ww = (:a, :b, :c, :d, :e)
     a = ww[((81 - i) % 5) + 1]
     b = ww[((82 - i) % 5) + 1]
     c = ww[((83 - i) % 5) + 1]
     d = ww[((84 - i) % 5) + 1]
     e = ww[((85 - i) % 5) + 1]
-
     f = Symbol("F", div(i - 1, 16))
     k = Symbol("K", div(i - 1, 16))
-
     r = left_p[i]
     s = left_q[i]
-
-    return esc(quote
-        t = $a + $f($b, $c, $d) + $k + unsafe_load(buf, $r)
-        $a = ROTL32(UInt32( t), UInt8($s)) + $e
-        $c = ROTL32(UInt32($c), UInt8(10))
+    esc(quote
+        t = $a + $f($b, $c, $d) + $k + load32_le(buf, $r)
+        $a = ROTL32(UInt32(t), UInt8($s)) + $e
+        $c = ROTL32($c, UInt8(10))
     end)
 end
 
-# Right lane generator macro
 macro R(i)
-    # @assert i <= 80
-    # @assert i >= 1
-
-    # Rotate the words
     ww = (:a, :b, :c, :d, :e)
     a = ww[((81 - i) % 5) + 1]
     b = ww[((82 - i) % 5) + 1]
     c = ww[((83 - i) % 5) + 1]
     d = ww[((84 - i) % 5) + 1]
     e = ww[((85 - i) % 5) + 1]
-
-    f = Symbol("F",  4 - div(i - 1, 16))
-    k = Symbol("KK",     div(i - 1, 16))
-
+    f = Symbol("F", 4 - div(i - 1, 16))
+    k = Symbol("KK", div(i - 1, 16))
     r = right_p[i]
     s = right_q[i]
-
-    return esc(quote
-        t = $a + $f($b, $c, $d) + $k + unsafe_load(buf, $r)
-        $a = ROTL32(UInt32( t), UInt8($s)) + $e
-        $c = ROTL32(UInt32($c), UInt8(10))
+    esc(quote
+        t = $a + $f($b, $c, $d) + $k + load32_le(buf, $r)
+        $a = ROTL32(UInt32(t), UInt8($s)) + $e
+        $c = ROTL32($c, UInt8(10))
     end)
 end
