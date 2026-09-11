@@ -5,18 +5,18 @@ if VERSION < v"0.7"
 end
 
 function openssl_ripemd160(x::AbstractString)
-    read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
+    read(pipeline(`printf %s $x`, `openssl ripemd160`), String)[10:end - 1]
 end
 
 function openssl_ripemd160(x::Array{UInt8, 1})
-    read(pipeline(`printf $(String(x))`,
+    read(pipeline(`printf %s $(String(x))`,
                   `openssl rmd160`),
          String)[10:end - 1]
 end
 
 function openssl_ripemd160(x::NTuple{N, UInt8}) where N
     t = String([x...])
-    read(pipeline(`printf $t`, `openssl rmd160`), String)[10:end - 1]
+    read(pipeline(`printf %s $t`, `openssl rmd160`), String)[10:end - 1]
 end
 
 function vs_openssl(x)
