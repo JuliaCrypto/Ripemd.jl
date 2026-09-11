@@ -1,4 +1,10 @@
-# Only works for little endian architectures (TODO: is there julia for big endian?)
+
+# Should work correctly on both little-endian and big-endian systems: word loads in transform!
+# R and L macros go through `load32_le` (uses `ltoh`), the bit-length field is written via `htol`,
+# and the final digest bytes are produced from `htol`-ed state words -- so all raw-pointer
+# traffic is explicitly normalized to the little-endian byte order RIPEMD-160 specifies, rather
+# than relying on the host's native order.
+
 function transform!(ctx::T) where T
 
     @inbounds begin
