@@ -1,31 +1,32 @@
-function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
-                                         U <: Union{DenseArray{UInt8, 1},
-                                                    NTuple{N, UInt8} where N}}
-    UIntXXX = typeof(ctx.count)
+"""
+    digest!(ctx::RIPEMD160_CTX)
 
-    len = convert(UIntXXX, length(data))
-    data_idx = convert(UIntXXX, 0)
-    usedspace = ctx.count % bytes_per_block(T)
+Finalize the RIPEMD160 hash computation and return the digest as a vector of bytes.
+Arguments
+---------
+ctx : RIPEMD160_CTX
+    The context containing the current state of the hash computation.
+Returns
+-------
+A vector of bytes representing the RIPEMD160 hash.
+"""
+function digest!(ctx::RIPEMD160_CTX)
+    pad_remainder!(ctx)
 
-    while len - data_idx + usedspace >= bytes_per_block(T)
-        copyto!(ctx.buffer, usedspace + 1,
-                data,       data_idx + 1,
-                bytes_per_block(T))
+    # RIPEMD-160 stores the 64-bit bit-length little-endian; `htol` makes
+    # this correct on big-endian hosts too (no-op on little-endian ones).
+    bits = htol(ctx.count << 3)
 
-        transform!(ctx)
+    p = Ptr{UInt64}(pointer(ctx.buffer, 57))
+    unsafe_store!(p, bits)
 
-        ctx.count += bytes_per_block(T) - usedspace
-        data_idx += bytes_per_block(T) - usedspace
-        usedspace = convert(UIntXXX, 0)
-    end
+    transform!(ctx)
 
-    if len > data_idx
-        copyto!(ctx.buffer, usedspace + 1,
-                data,       data_idx + 1,
-                len - data_idx)
-        ctx.count += len - data_idx
-    end
-    return nothing
+    # The five UInt32 state words must be emitted as little-endian bytes
+    # regardless of host order, so convert each word with `htol` before
+    # reinterpreting it as raw bytes.
+    le_state = map(htol, ctx.state)
+    reinterpret(UInt8, le_state)[1:20] # we need [1:20] to make a copy here
 end
 
 function pad_remainder!(ctx::T) where {T <: RIPEMD160_CTX}
