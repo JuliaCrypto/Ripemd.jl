@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - master
-      - addci
     tags: '*'
 jobs:
   test:
