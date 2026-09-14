@@ -4,20 +4,31 @@ if VERSION < v"0.7"
     Base.read(x, ::Type{String}) = readstring(x)
 end
 
-function openssl_ripemd160(x::AbstractString)
-    read(pipeline(`printf $x`, `openssl ripemd160`), String)[10:end - 1]
+
+const LIBCRYPTO = "libcrypto"
+
+const ROCKY_SPEECH = "I'd hold you up to say to your mother, 'this kid's gonna be the best kid in the world. This kid's gonna be somebody better than anybody I ever knew.' And you grew up good and wonderful. It was great just watching you, every day was like a privilege. Then the time come for you to be your own man and take on the world, and you did. But somewhere along the line, you changed. You stopped being you. You let people stick a finger in your face and tell you you're no good. And when things got hard, you started looking for something to blame, like a big shadow. Let me tell you something you already know. The world ain't all sunshine and rainbows. It's a very mean and nasty place and I don't care how tough you are it will beat you to your knees and keep you there permanently if you let it. You, me, or nobody is gonna hit as hard as life. But it ain't about how hard ya hit. It's about how hard you can get hit and keep moving forward. How much you can take and keep moving forward. That's how winning is done! Now if you know what you're worth then go out and get what you're worth. But ya gotta be willing to take the hits, and not pointing fingers saying you ain't where you wanna be because of him, or her, or anybody! Cowards do that and that ain't you! You're better than that! I'm always gonna love you no matter what. No matter what happens. You're my son and you're my blood. You're the best thing in my life. But until you start believing in yourself, ya ain't gonna have a life. Don't forget to visit your mother."
+const ROCKY_RIPEMD160 = "fff55c23c197b4fded67e09424e5aef9dafad1c6"
+
+function openssl_ripemd160_bytes(data::Vector{UInt8})
+    md = ccall((:EVP_get_digestbyname, LIBCRYPTO), Ptr{Cvoid}, (Cstring,), "RIPEMD160")
+    md == C_NULL && error("RIPEMD160 not available in this OpenSSL build " *
+                           "(OpenSSL 3.x may need the 'legacy' provider loaded)")
+
+    out = Vector{UInt8}(undef, 20)   # EVP_MAX_MD_SIZE-safe for RIPEMD160 (160 bit = 20 bytes)
+    outlen = Ref{Cuint}(0)
+
+    ret = ccall((:EVP_Digest, LIBCRYPTO), Cint,
+                (Ptr{UInt8}, Csize_t, Ptr{UInt8}, Ptr{Cuint}, Ptr{Cvoid}, Ptr{Cvoid}),
+                data, length(data), out, outlen, md, C_NULL)
+    ret == 1 || error("EVP_Digest failed")
+
+    return bytes2hex(out)
 end
 
-function openssl_ripemd160(x::Array{UInt8, 1})
-    read(pipeline(`printf $(String(x))`,
-                  `openssl rmd160`),
-         String)[10:end - 1]
-end
-
-function openssl_ripemd160(x::NTuple{N, UInt8}) where N
-    t = String([x...])
-    read(pipeline(`printf $t`, `openssl rmd160`), String)[10:end - 1]
-end
+openssl_ripemd160(x::AbstractString) = openssl_ripemd160_bytes(Vector{UInt8}(codeunits(x)))
+openssl_ripemd160(x::Array{UInt8,1}) = openssl_ripemd160_bytes(x)
+openssl_ripemd160(x::NTuple{N,UInt8}) where {N} = openssl_ripemd160_bytes(collect(x))
 
 function vs_openssl(x)
     bytes2hex(Ripemd.ripemd160(x)) == openssl_ripemd160(x)
@@ -58,17 +69,17 @@ end
     end
 end
 
-@testset "Ripemd160 1M a's" begin
+@testset "Ripemd160 1M a's        " begin
 
-    d1 = [0x61 for i in 1:1_000_000];
-    d2 = ntuple((i) -> 0x61, 1_000_000);
+    d1 = [0x61 for i in 1:1_000_000]
+    d2 = ntuple((i) -> 0x61, 1_000_000)
     r = "52783243c1697bdbe16d37f97f68f08325dc1528"
 
     @test bytes2hex(Ripemd.ripemd160(d1)) == r
     @test bytes2hex(Ripemd.ripemd160(d2)) == r
 end
 
-@testset "Ripemd160" begin
+@testset "Ripemd160               " begin
     @test bytes2hex(Ripemd.ripemd160("asdf")) ==
         "0ef2aed6346def670a8019e4ea42cf4c76018139"
     @test bytes2hex(Ripemd.ripemd160("")) ==
@@ -81,8 +92,9 @@ end
         "5d0689ef49d2fae572b881b123a85ffa21595f36"
     @test bytes2hex(Ripemd.ripemd160("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")) ==
         "b0e20b6e3116640286ed3a87a5713079b21f5189"
-    @test bytes2hex(Ripemd.ripemd160("I'd hold you up to say to your mother, 'this kid's gonna be the best kid in the world. This kid's gonna be somebody better than anybody I ever knew.' And you grew up good and wonderful. It was great just watching you, every day was like a privilege. Then the time come for you to be your own man and take on the world, and you did. But somewhere along the line, you changed. You stopped being you. You let people stick a finger in your face and tell you you're no good. And when things got hard, you started looking for something to blame, like a big shadow. Let me tell you something you already know. The world ain't all sunshine and rainbows. It's a very mean and nasty place and I don't care how tough you are it will beat you to your knees and keep you there permanently if you let it. You, me, or nobody is gonna hit as hard as life. But it ain't about how hard ya hit. It's about how hard you can get hit and keep moving forward. How much you can take and keep moving forward. That's how winning is done! Now if you know what you're worth then go out and get what you're worth. But ya gotta be willing to take the hits, and not pointing fingers saying you ain't where you wanna be because of him, or her, or anybody! Cowards do that and that ain't you! You're better than that! I'm always gonna love you no matter what. No matter what happens. You're my son and you're my blood. You're the best thing in my life. But until you start believing in yourself, ya ain't gonna have a life. Don't forget to visit your mother.")) ==
-        "fff55c23c197b4fded67e09424e5aef9dafad1c6"
+
+    @test bytes2hex(Ripemd.ripemd160(ROCKY_SPEECH)) == ROCKY_RIPEMD160
+
     @test bytes2hex(Ripemd.ripemd160(Ripemd.codeunits("asdf"))) ==
         "0ef2aed6346def670a8019e4ea42cf4c76018139"
     @test bytes2hex(Ripemd.ripemd160(Ripemd.codeunits(""))) ==
@@ -95,8 +107,8 @@ end
         "5d0689ef49d2fae572b881b123a85ffa21595f36"
     @test bytes2hex(Ripemd.ripemd160(Ripemd.codeunits("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"))) ==
         "b0e20b6e3116640286ed3a87a5713079b21f5189"
-    @test bytes2hex(Ripemd.ripemd160(Ripemd.codeunits("I'd hold you up to say to your mother, 'this kid's gonna be the best kid in the world. This kid's gonna be somebody better than anybody I ever knew.' And you grew up good and wonderful. It was great just watching you, every day was like a privilege. Then the time come for you to be your own man and take on the world, and you did. But somewhere along the line, you changed. You stopped being you. You let people stick a finger in your face and tell you you're no good. And when things got hard, you started looking for something to blame, like a big shadow. Let me tell you something you already know. The world ain't all sunshine and rainbows. It's a very mean and nasty place and I don't care how tough you are it will beat you to your knees and keep you there permanently if you let it. You, me, or nobody is gonna hit as hard as life. But it ain't about how hard ya hit. It's about how hard you can get hit and keep moving forward. How much you can take and keep moving forward. That's how winning is done! Now if you know what you're worth then go out and get what you're worth. But ya gotta be willing to take the hits, and not pointing fingers saying you ain't where you wanna be because of him, or her, or anybody! Cowards do that and that ain't you! You're better than that! I'm always gonna love you no matter what. No matter what happens. You're my son and you're my blood. You're the best thing in my life. But until you start believing in yourself, ya ain't gonna have a life. Don't forget to visit your mother."))) ==
-        "fff55c23c197b4fded67e09424e5aef9dafad1c6"
+    @test bytes2hex(Ripemd.ripemd160(Ripemd.codeunits(ROCKY_SPEECH))) == ROCKY_RIPEMD160
+
     @test bytes2hex(Ripemd.ripemd160((Ripemd.codeunits("asdf")...,))) ==
         "0ef2aed6346def670a8019e4ea42cf4c76018139"
     @test bytes2hex(Ripemd.ripemd160((Ripemd.codeunits("")...,))) ==
@@ -109,6 +121,6 @@ end
         "5d0689ef49d2fae572b881b123a85ffa21595f36"
     @test bytes2hex(Ripemd.ripemd160((Ripemd.codeunits("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")...,))) ==
         "b0e20b6e3116640286ed3a87a5713079b21f5189"
-    @test bytes2hex(Ripemd.ripemd160((Ripemd.codeunits("I'd hold you up to say to your mother, 'this kid's gonna be the best kid in the world. This kid's gonna be somebody better than anybody I ever knew.' And you grew up good and wonderful. It was great just watching you, every day was like a privilege. Then the time come for you to be your own man and take on the world, and you did. But somewhere along the line, you changed. You stopped being you. You let people stick a finger in your face and tell you you're no good. And when things got hard, you started looking for something to blame, like a big shadow. Let me tell you something you already know. The world ain't all sunshine and rainbows. It's a very mean and nasty place and I don't care how tough you are it will beat you to your knees and keep you there permanently if you let it. You, me, or nobody is gonna hit as hard as life. But it ain't about how hard ya hit. It's about how hard you can get hit and keep moving forward. How much you can take and keep moving forward. That's how winning is done! Now if you know what you're worth then go out and get what you're worth. But ya gotta be willing to take the hits, and not pointing fingers saying you ain't where you wanna be because of him, or her, or anybody! Cowards do that and that ain't you! You're better than that! I'm always gonna love you no matter what. No matter what happens. You're my son and you're my blood. You're the best thing in my life. But until you start believing in yourself, ya ain't gonna have a life. Don't forget to visit your mother.")...,))) ==
-        "fff55c23c197b4fded67e09424e5aef9dafad1c6"
+    @test bytes2hex(Ripemd.ripemd160((Ripemd.codeunits(ROCKY_SPEECH)...,))) == ROCKY_RIPEMD160
 end
+
