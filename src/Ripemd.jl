@@ -1,7 +1,6 @@
 __precompile__()
 
 module Ripemd
-using Compat
 
 export ripemd160, update!, digest!, RIPEMD160_CTX
 
