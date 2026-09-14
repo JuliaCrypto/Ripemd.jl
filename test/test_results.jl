@@ -2,27 +2,32 @@ if VERSION < v"0.7"
     Base.read(x, ::Type{String}) = readstring(x)
 end
 
-function openssl_ripemd160(x::AbstractString)
-    read(pipeline(`printf $x`,
-                  `openssl ripemd160 -r`,
-                  `cut -d' ' -f1`),
-         String)[1:end-1]
+# Compute RIPEMD160 via a direct FFI call into libcrypto's EVP API,
+# instead of shelling out to the `openssl` CLI with backticks.
+#
+# This resolves the digest by name at call time (EVP_get_digestbyname),
+# which works across OpenSSL 1.1.x and 3.x, then computes a one-shot
+# digest with EVP_Digest. 
+
+const LIBCRYPTO = "libcrypto"
+const EvpRIPEMD160 = ccall((:EVP_get_digestbyname, LIBCRYPTO), Ptr{Cvoid}, (Cstring,), "RIPEMD160")
+EvpRIPEMD160 == C_NULL && error("RIPEMD160 not available in this OpenSSL build (3.x may need the 'legacy' provider loaded)")
+
+function openssl_ripemd160_bytes(data::Vector{UInt8})
+    out = Vector{UInt8}(undef, 20)   # EVP_MAX_MD_SIZE-safe for RIPEMD160 (160 bit = 20 bytes)
+    outlen = Ref{Cuint}(0)
+
+    ret = ccall((:EVP_Digest, LIBCRYPTO), Cint,
+                (Ptr{UInt8}, Csize_t, Ptr{UInt8}, Ptr{Cuint}, Ptr{Cvoid}, Ptr{Cvoid}),
+                data, length(data), out, outlen, EvpRIPEMD160, C_NULL)
+    ret == 1 || error("ccall to EVP_Digest failed")
+
+    return bytes2hex(out)
 end
 
-function openssl_ripemd160(x::Array{UInt8, 1})
-    read(pipeline(`printf $(String(x))`,
-                  `openssl rmd160 -r`,
-                  `cut -d' ' -f1`),
-         String)[1:end-1]
-end
-
-function openssl_ripemd160(x::NTuple{N, UInt8}) where N
-    t = String([x...])
-    read(pipeline(`printf $t`,
-                  `openssl rmd160 -r`,
-                  `cut -d' ' -f1`),
-         String)[1:end-1]
-end
+openssl_ripemd160(x::AbstractString) = openssl_ripemd160_bytes(Vector{UInt8}(codeunits(x)))
+openssl_ripemd160(x::Array{UInt8,1}) = openssl_ripemd160_bytes(x)
+openssl_ripemd160(x::NTuple{N,UInt8}) where {N} = openssl_ripemd160_bytes(collect(x))
 
 function vs_openssl(x)
     bytes2hex(Ripemd.ripemd160(x)) == openssl_ripemd160(x)
