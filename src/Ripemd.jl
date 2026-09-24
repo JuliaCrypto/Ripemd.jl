@@ -2,12 +2,13 @@ __precompile__()
 
 module Ripemd
 
-export ripemd160, update!, digest!, RIPEMD160_CTX
+export ripemd160, update!, digest!, RIPEMD160_CTX, pack_messages
 
 include("consts.jl")
 include("types.jl")
 include("interface.jl")
 include("transform.jl")
+include("batch.jl")
 
 if VERSION < v"0.7.0-DEV.3213"
     codeunits(x) = convert(Array{UInt8}, x)

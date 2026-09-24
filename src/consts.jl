@@ -21,6 +21,14 @@ const KK3 = 0x7A6D76E9
 const KK4 = 0x00000000
 
 @inline ROTL32(num, shift::T) where T = (num << shift) | (num >> (T(32) - shift))
+
+# Word access used by the round macros: works on a raw pointer into the
+# context buffer (streaming CPU path) and on a tuple of 16 words (pure
+# functional path shared by the batch CPU and GPU backends).
+@inline getword(buf::Ptr{UInt32}, r) = unsafe_load(buf, r)
+@inline getword(buf::NTuple{16, UInt32}, r) = @inbounds buf[r]
+
+const INIT_STATE_TUPLE = (0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0)
 @inline F0(x, y, z) = x ⊻ y ⊻ z
 @inline F1(x, y, z) = (x & y) | (~x & z)
 @inline F2(x, y, z) = (x | ~y) ⊻ z
@@ -68,7 +76,7 @@ macro L(i)
     s = left_q[i]
 
     return esc(quote
-        t = $a + $f($b, $c, $d) + $k + unsafe_load(buf, $r)
+        t = $a + $f($b, $c, $d) + $k + getword(buf, $r)
         $a = ROTL32(UInt32( t), UInt8($s)) + $e
         $c = ROTL32(UInt32($c), UInt8(10))
     end)
@@ -94,7 +102,7 @@ macro R(i)
     s = right_q[i]
 
     return esc(quote
-        t = $a + $f($b, $c, $d) + $k + unsafe_load(buf, $r)
+        t = $a + $f($b, $c, $d) + $k + getword(buf, $r)
         $a = ROTL32(UInt32( t), UInt8($s)) + $e
         $c = ROTL32(UInt32($c), UInt8(10))
     end)

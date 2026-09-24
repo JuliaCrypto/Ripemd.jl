@@ -1,10 +1,17 @@
 name = "Ripemd"
 uuid = "92ef3814-971d-54d3-b0c1-59b1d13fee15"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Guido Kraemer <gdkrmr@users.noreply.github.com>"]
 
 [deps]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
+[weakdeps]
+AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+
+[extensions]
+RipemdAMDGPUExt = "AMDGPU"
+
 [compat]
+AMDGPU = "1, 2"
 julia = "0.7, 1"
