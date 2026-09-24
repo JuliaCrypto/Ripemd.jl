@@ -38,6 +38,14 @@ function ripemd160_fixed_kernel!(out, msgs, len, n)
     return nothing
 end
 
+"""
+    ripemd160(data::ROCVector{UInt8}, offsets::ROCVector{<:Integer})
+
+GPU version of the ragged batch API: message `i` is
+`data[offsets[i] + 1 : offsets[i + 1]]`, one work-item per message. Returns a
+`20 × N` `ROCMatrix{UInt8}`. The launch is asynchronous; `Array(result)` or
+`AMDGPU.synchronize()` waits for it.
+"""
 function Ripemd.ripemd160(data::ROCVector{UInt8}, offsets::ROCVector{<:Integer})
     n = length(offsets) - 1
     n >= 0 || throw(ArgumentError("offsets must have at least one entry"))
@@ -48,6 +56,13 @@ function Ripemd.ripemd160(data::ROCVector{UInt8}, offsets::ROCVector{<:Integer})
     return out
 end
 
+"""
+    ripemd160(msgs::ROCMatrix{UInt8})
+
+GPU version of the fixed-length batch API: every column of `msgs` is one
+message, one work-item per message. Returns a `20 × size(msgs, 2)`
+`ROCMatrix{UInt8}`.
+"""
 function Ripemd.ripemd160(msgs::ROCMatrix{UInt8})
     len, n = size(msgs)
     out = ROCArray{UInt8}(undef, digest_length(RIPEMD160_CTX), n)
@@ -57,7 +72,13 @@ function Ripemd.ripemd160(msgs::ROCMatrix{UInt8})
     return out
 end
 
-# a single message living on the GPU
+"""
+    ripemd160(msg::ROCVector{UInt8})
+
+Hash a single message that lives on the GPU. Returns the 20-byte digest as a
+`ROCVector{UInt8}`. This runs on one work-item and is only useful to avoid a
+transfer; for throughput hash many messages at once.
+"""
 function Ripemd.ripemd160(msg::ROCVector{UInt8})
     return vec(Ripemd.ripemd160(reshape(msg, length(msg), 1)))
 end
