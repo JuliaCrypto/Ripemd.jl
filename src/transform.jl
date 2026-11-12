@@ -1,4 +1,4 @@
-# Only works for little endian architectures (TODO: is there julia for big endian?)
+# Only works on little-endian machines, see check_endianness
 function transform!(ctx::T) where T
 
     buffer = ctx.buffer
