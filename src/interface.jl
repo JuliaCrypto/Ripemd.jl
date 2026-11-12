@@ -8,14 +8,16 @@ function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
     usedspace = ctx.count % bytes_per_block(T)
 
     while len - data_idx + usedspace >= bytes_per_block(T)
+        # fill up the rest of the (possibly partially filled) buffer
+        n = bytes_per_block(T) - usedspace
         copyto!(ctx.buffer, usedspace + 1,
                 data,       data_idx + 1,
-                bytes_per_block(T))
+                n)
 
         transform!(ctx)
 
-        ctx.count += bytes_per_block(T) - usedspace
-        data_idx += bytes_per_block(T) - usedspace
+        ctx.count += n
+        data_idx += n
         usedspace = convert(UIntXXX, 0)
     end
 
