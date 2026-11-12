@@ -1,5 +1,10 @@
 module Ripemd
 
+# Extend the generic hashing interface of the SHA stdlib instead of defining
+# separate functions, so that `using SHA, Ripemd` does not make `update!` and
+# `digest!` ambiguous.
+import SHA: update!, digest!
+
 export ripemd160, update!, digest!, RIPEMD160_CTX
 
 include("consts.jl")
