@@ -106,3 +106,31 @@ end
     @test bytes2hex(Ripemd.ripemd160((codeunits("I'd hold you up to say to your mother, 'this kid's gonna be the best kid in the world. This kid's gonna be somebody better than anybody I ever knew.' And you grew up good and wonderful. It was great just watching you, every day was like a privilege. Then the time come for you to be your own man and take on the world, and you did. But somewhere along the line, you changed. You stopped being you. You let people stick a finger in your face and tell you you're no good. And when things got hard, you started looking for something to blame, like a big shadow. Let me tell you something you already know. The world ain't all sunshine and rainbows. It's a very mean and nasty place and I don't care how tough you are it will beat you to your knees and keep you there permanently if you let it. You, me, or nobody is gonna hit as hard as life. But it ain't about how hard ya hit. It's about how hard you can get hit and keep moving forward. How much you can take and keep moving forward. That's how winning is done! Now if you know what you're worth then go out and get what you're worth. But ya gotta be willing to take the hits, and not pointing fingers saying you ain't where you wanna be because of him, or her, or anybody! Cowards do that and that ain't you! You're better than that! I'm always gonna love you no matter what. No matter what happens. You're my son and you're my blood. You're the best thing in my life. But until you start believing in yourself, ya ain't gonna have a life. Don't forget to visit your mother.")...,))) ==
         "fff55c23c197b4fded67e09424e5aef9dafad1c6"
 end
+
+# Small deterministic byte generator (xorshift64), so the test data does not
+# depend on the Random stdlib's stream, which may change between versions.
+function pseudorandom_bytes(n::Integer, seed::UInt64)
+    x = seed
+    out = Vector{UInt8}(undef, n)
+    for i in 1:n
+        x ⊻= x << 13; x ⊻= x >> 7; x ⊻= x << 17
+        out[i] = x % UInt8
+    end
+    return out
+end
+
+# The tests above only use printable ASCII and already cover all lengths
+# around the block boundaries; these cover the remaining byte values.
+@testset "Ripemd160 vs openssl binary data" begin
+    for b in 0x00:0xff
+        @test vs_openssl([b])
+    end
+    for b in (0x00, 0x80, 0xff)
+        @test vs_openssl(fill(b, 1000))
+    end
+    # NUL bytes, printf metacharacters and invalid UTF-8
+    @test vs_openssl(UInt8[0x00, 0x25, 0x73, 0x5c, 0x6e, 0x00, 0xc3, 0x28, 0xff, 0xfe, 0x00])
+    for n in (55, 56, 63, 64, 65, 2^20)
+        @test vs_openssl(pseudorandom_bytes(n, UInt64(0x9e3779b97f4a7c15) + n))
+    end
+end
