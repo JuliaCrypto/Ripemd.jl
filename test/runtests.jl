@@ -1,23 +1,13 @@
 using Ripemd
-if VERSION < v"1.0.0"
-    using Base.Test
-else
-    using Test
+using Test
+
+# Run every test/test_*.jl in a fixed (alphabetical) order, independent of
+# the working directory and of file modification times.
+const TEST_DIR = @__DIR__
+const TEST_FILES = sort!(filter(f -> occursin(r"^test_.*\.jl$", f), readdir(TEST_DIR)))
+
+@testset "Ripemd" begin
+    for f in TEST_FILES
+        include(joinpath(TEST_DIR, f))
+    end
 end
-
-files = readdir(".")
-
-# use only files that are named test_*.jl and start with the newest
-
-if VERSION < v"0.7.0"
-    filter!(x -> contains(x, r"^test_"), files)
-else
-    filter!(x -> occursin(r"^test_", x), files)
-end
-
-sort!(files, by = x -> stat(x).mtime, rev = true)
-
-for f in files
-    include(f)
-end
-
