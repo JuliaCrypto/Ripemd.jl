@@ -1,3 +1,5 @@
+using Ripemd
+using Test
 using OpenSSL_jll: libcrypto
 
 # Reference implementation: RIPEMD160() from OpenSSL's libcrypto.
