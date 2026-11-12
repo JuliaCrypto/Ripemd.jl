@@ -1,6 +1,26 @@
-function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
-                                         U <: Union{DenseArray{UInt8, 1},
-                                                    NTuple{N, UInt8} where N}}
+const ByteData = Union{AbstractVector{UInt8}, NTuple{N, UInt8} where N}
+
+# Copy n bytes from data, starting after the first soff bytes, into
+# buf[doff+1:doff+n].
+@inline function copybytes!(buf::Vector{UInt8}, doff, data::AbstractVector{UInt8}, soff, n)
+    copyto!(buf, doff + 1, data, firstindex(data) + soff, n)
+end
+@inline function copybytes!(buf::Vector{UInt8}, doff, data::Tuple, soff, n)
+    # the generic copyto! for tuples iterates from the start every time
+    @inbounds for i in 1:n
+        buf[doff + i] = data[soff + i]
+    end
+    return buf
+end
+
+"""
+    update!(ctx::RIPEMD160_CTX, data)
+
+Feed `data` into the hash context `ctx`. `data` can be any
+`AbstractVector{UInt8}`, a tuple of `UInt8`s, an `AbstractString` (its UTF-8
+bytes are hashed) or an `IO` (read until `eof`).
+"""
+function update!(ctx::T, data::ByteData) where {T <: RIPEMD160_CTX}
     UIntXXX = typeof(ctx.count)
 
     len = convert(UIntXXX, length(data))
@@ -10,9 +30,7 @@ function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
     while len - data_idx + usedspace >= bytes_per_block(T)
         # fill up the rest of the (possibly partially filled) buffer
         n = bytes_per_block(T) - usedspace
-        copyto!(ctx.buffer, usedspace + 1,
-                data,       data_idx + 1,
-                n)
+        copybytes!(ctx.buffer, usedspace, data, data_idx, n)
 
         transform!(ctx)
 
@@ -22,10 +40,19 @@ function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
     end
 
     if len > data_idx
-        copyto!(ctx.buffer, usedspace + 1,
-                data,       data_idx + 1,
-                len - data_idx)
+        copybytes!(ctx.buffer, usedspace, data, data_idx, len - data_idx)
         ctx.count += len - data_idx
+    end
+    return nothing
+end
+
+update!(ctx::RIPEMD160_CTX, str::AbstractString) = update!(ctx, codeunits(String(str)))
+
+function update!(ctx::RIPEMD160_CTX, io::IO; chunksize::Integer = 64 * 1024)
+    buf = Vector{UInt8}(undef, chunksize)
+    while !eof(io)
+        n = readbytes!(io, buf)
+        update!(ctx, view(buf, 1:n))
     end
     return nothing
 end
