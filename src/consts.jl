@@ -1,7 +1,13 @@
-# TODO:
-const BIG_ENDIAN = ENDIAN_BOM == 0x01020304
+# The implementation reads message words, writes the bit length and returns
+# the digest by reinterpreting memory, which is only correct on little-endian
+# machines. Refuse to run elsewhere instead of returning wrong hashes.
+function check_endianness(bom::UInt32 = ENDIAN_BOM)
+    bom == 0x04030201 && return nothing
+    error("Ripemd.jl only supports little-endian machines " *
+          "(ENDIAN_BOM = 0x$(string(bom, base = 16, pad = 8)))")
+end
 
-# TODO: endianness
+__init__() = check_endianness()
 
 const INIT_STATE = UInt32[0x67452301,
                           0xEFCDAB89,
