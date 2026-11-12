@@ -2,6 +2,7 @@ function update!(ctx::T, data::U) where {T <: RIPEMD160_CTX,
                                          U <: Union{DenseArray{UInt8, 1},
                                                     NTuple{N, UInt8} where N}}
     UIntXXX = typeof(ctx.count)
+    ctx.used && error("Cannot update CTX after `digest!` has been called on it")
 
     len = convert(UIntXXX, length(data))
     data_idx = convert(UIntXXX, 0)
@@ -65,7 +66,9 @@ function pad_remainder!(ctx::T) where {T <: RIPEMD160_CTX}
     return nothing
 end
 
-function digest!(ctx::T) where {T <: RIPEMD160_CTX}
+# Pad the message and process the final block(s); afterwards ctx.state holds
+# the digest.
+function finalize!(ctx::T) where {T <: RIPEMD160_CTX}
     pad_remainder!(ctx)
 
     # bitcount_idx = div(words_per_block(T), sizeof(ctx.count)) + 1
@@ -73,8 +76,18 @@ function digest!(ctx::T) where {T <: RIPEMD160_CTX}
     unsafe_store!(pbuf, UInt64(ctx.count * 8), 8)
 
     transform!(ctx)
+    ctx.used = true
+    return nothing
+end
 
-    # TODO: is this safe for 0.7? the [1:end] should make a copy and get around
-    # the lazy reinterpret.
+"""
+    digest!(ctx::RIPEMD160_CTX)
+
+Finalize the hash computation and return the 20-byte digest. After this, `ctx`
+cannot be updated anymore; calling `digest!` again returns the same digest.
+"""
+function digest!(ctx::T) where {T <: RIPEMD160_CTX}
+    ctx.used || finalize!(ctx)
+    # indexing copies, so the result does not alias ctx.state
     return reinterpret(UInt8, ctx.state)[1:digest_length(T)]
 end

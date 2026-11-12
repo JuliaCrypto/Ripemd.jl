@@ -6,6 +6,7 @@ mutable struct RIPEMD160_CTX <: RIPEMD_CTX
     count  :: UInt64           # how many bytes we already ingested
     buffer :: Array{UInt8, 1}  # message is copied here, read as UInt32 in
                                # transform!
+    used   :: Bool             # digest! has been called, no more updates
 end
 
 # length of the buffer
@@ -16,5 +17,9 @@ state_type(::Type{RIPEMD160_CTX}) = UInt32
 digest_length(::Type{RIPEMD160_CTX}) = 20
 
 function RIPEMD160_CTX()
-    RIPEMD160_CTX(copy(INIT_STATE), 0 , zeros(UInt8, bytes_per_block(RIPEMD160_CTX)))
+    RIPEMD160_CTX(copy(INIT_STATE), 0 , zeros(UInt8, bytes_per_block(RIPEMD160_CTX)), false)
 end
+
+Base.copy(ctx::RIPEMD160_CTX) =
+    RIPEMD160_CTX(copy(ctx.state), ctx.count, copy(ctx.buffer), ctx.used)
+
