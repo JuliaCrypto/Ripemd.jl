@@ -1,8 +1,9 @@
 # Only works for little endian architectures (TODO: is there julia for big endian?)
 function transform!(ctx::T) where T
 
-    @inbounds begin
-        buf = Ptr{UInt32}(pointer(ctx.buffer))
+    buffer = ctx.buffer
+    GC.@preserve buffer @inbounds begin
+        buf = Ptr{UInt32}(pointer(buffer))
 
         # TODO: the bitcoin implementation alternates left and right lane, is
         # this faster?

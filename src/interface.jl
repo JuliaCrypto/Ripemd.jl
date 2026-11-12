@@ -74,8 +74,11 @@ function finalize!(ctx::T) where {T <: RIPEMD160_CTX}
     pad_remainder!(ctx)
 
     # bitcount_idx = div(words_per_block(T), sizeof(ctx.count)) + 1
-    pbuf = Ptr{typeof(ctx.count)}(pointer(ctx.buffer))
-    unsafe_store!(pbuf, UInt64(ctx.count * 8), 8)
+    buffer = ctx.buffer
+    GC.@preserve buffer begin
+        pbuf = Ptr{typeof(ctx.count)}(pointer(buffer))
+        unsafe_store!(pbuf, UInt64(ctx.count * 8), 8)
+    end
 
     transform!(ctx)
     ctx.used = true
