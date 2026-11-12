@@ -1,19 +1,11 @@
 using Ripemd
-if VERSION < v"1.0.0"
-    using Base.Test
-else
-    using Test
-end
+using Test
 
 files = readdir(".")
 
 # use only files that are named test_*.jl and start with the newest
 
-if VERSION < v"0.7.0"
-    filter!(x -> contains(x, r"^test_"), files)
-else
-    filter!(x -> occursin(r"^test_", x), files)
-end
+filter!(x -> occursin(r"^test_", x), files)
 
 sort!(files, by = x -> stat(x).mtime, rev = true)
 
