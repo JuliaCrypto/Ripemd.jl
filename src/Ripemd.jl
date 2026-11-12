@@ -1,5 +1,3 @@
-__precompile__()
-
 module Ripemd
 
 export ripemd160, update!, digest!, RIPEMD160_CTX
