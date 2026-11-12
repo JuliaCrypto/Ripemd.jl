@@ -1,5 +1,6 @@
 using Ripemd
 using Test
+using OffsetArrays: OffsetVector
 
 @testset "input types" begin
     data = UInt8[UInt8((31 * i + 7) % 256) for i in 1:1000]
@@ -12,6 +13,15 @@ using Test
         @test ripemd160(reinterpret(UInt8, reinterpret(UInt32, data))) == ref
         @test ripemd160(0x00:0xff) == ripemd160(collect(0x00:0xff)) # range
         @test ripemd160(codeunits("abc")) == ripemd160(b"abc")
+    end
+
+    @testset "offset indices (firstindex = $(o + 1))" for o in (-1000, -11, -1, 0, 5)
+        @test ripemd160(OffsetVector(data, o)) == ref
+        # partial blocks, so that copying starts at a non-zero source offset
+        ctx = RIPEMD160_CTX()
+        update!(ctx, OffsetVector(data[1:30], o))
+        update!(ctx, OffsetVector(data[31:end], o))
+        @test digest!(ctx) == ref
     end
 
     @testset "tuples" begin
@@ -31,6 +41,15 @@ using Test
         ctx = RIPEMD160_CTX()
         update!(ctx, IOBuffer(data); chunksize = 7)   # chunks not aligned to blocks
         @test digest!(ctx) == ref
+        # invalid chunk sizes are rejected instead of looping forever
+        @test_throws ArgumentError update!(RIPEMD160_CTX(), IOBuffer(data); chunksize = 0)
+        @test_throws ArgumentError update!(RIPEMD160_CTX(), IOBuffer(data); chunksize = -1)
+        # a used context rejects IO input without consuming it, also if empty
+        ctx = RIPEMD160_CTX(); digest!(ctx)
+        io = IOBuffer(data)
+        @test_throws ErrorException update!(ctx, io)
+        @test position(io) == 0
+        @test_throws ErrorException update!(ctx, IOBuffer(UInt8[]))
         mktemp() do path, io
             write(io, data); close(io)
             @test open(ripemd160, path) == ref

@@ -3,7 +3,9 @@ const ByteData = Union{AbstractVector{UInt8}, NTuple{N, UInt8} where N}
 # Copy n bytes from data, starting after the first soff bytes, into
 # buf[doff+1:doff+n].
 @inline function copybytes!(buf::Vector{UInt8}, doff, data::AbstractVector{UInt8}, soff, n)
-    copyto!(buf, doff + 1, data, firstindex(data) + soff, n)
+    # the offsets are unsigned; mixing them with a negative firstindex (e.g.
+    # of an OffsetArray) would wrap around, so do the index arithmetic in Int
+    copyto!(buf, Int(doff) + 1, data, firstindex(data) + Int(soff), Int(n))
 end
 @inline function copybytes!(buf::Vector{UInt8}, doff, data::Tuple, soff, n)
     # the generic copyto! for tuples iterates from the start every time
@@ -50,6 +52,9 @@ end
 update!(ctx::RIPEMD160_CTX, str::AbstractString) = update!(ctx, codeunits(String(str)))
 
 function update!(ctx::RIPEMD160_CTX, io::IO; chunksize::Integer = 64 * 1024)
+    # check before reading, so that nothing is consumed from io on error
+    ctx.used && error("Cannot update CTX after `digest!` has been called on it")
+    chunksize > 0 || throw(ArgumentError("chunksize must be positive, got $chunksize"))
     buf = Vector{UInt8}(undef, chunksize)
     while !eof(io)
         n = readbytes!(io, buf)
